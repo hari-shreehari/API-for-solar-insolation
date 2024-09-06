@@ -4,7 +4,7 @@ Endpoint to generate solar insolation value based on time for the Ahmedabad regi
 
 ## Endpoints
 
-### `/get-data/`
+### `api-for-solar-insolation.vercel.app/api/get-data/`
 - **Description**: Weather Data Retrieval and Solar Insolation Prediction Endpoint
 - **Method**: POST
 - **Request Body Sample**:
