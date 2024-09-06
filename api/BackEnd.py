@@ -33,7 +33,7 @@ class DataRequest(BaseModel):
     day: int
     hour: int
 
-@app.post("/get-data/")
+@app.post("/api/get-data/")
 async def get_data(request: DataRequest):
     year = request.year
     month = request.month
