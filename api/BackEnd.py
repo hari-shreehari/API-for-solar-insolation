@@ -84,9 +84,8 @@ async def get_data(request: DataRequest):
                 hour=hour,
                 api_name="/predict"
             )
-
-            prediction_value = float(result[0][0])
-            final_prediction = round(prediction_value, 3) if prediction_value > 10 else 0
+            
+            final_prediction = round(float(result), 3) if float(result) > 10 else 0
 
             return {
                 "status": "success",
