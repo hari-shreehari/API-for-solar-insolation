@@ -21,8 +21,6 @@ supabase_url = os.getenv("SUPABASE_URL")
 supabase_key = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(supabase_url, supabase_key)
 
-gradio_client = GradioClient("ShreehariS754/X-Helios-Gradio")
-
 @app.get("/")
 async def root():
     return {"message": "Blank Space"}
@@ -33,6 +31,18 @@ class DataRequest(BaseModel):
     day: int
     hour: int
 
+def is_leap_year(year):
+    return (year % 4 == 0 and year % 100 != 0) or (year % 400 == 0)
+
+def is_valid_day(year, month, day):
+    days_in_month = {1: 31, 2: 28, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31}
+    if month == 2:
+        if is_leap_year(year):
+            return 1 <= day <= 29
+        else:
+            return 1 <= day <= 28
+    return 1 <= day <= days_in_month.get(month, 31)
+
 @app.post("/api/get-data/")
 async def get_data(request: DataRequest):
     year = request.year
@@ -40,15 +50,52 @@ async def get_data(request: DataRequest):
     day = request.day
     hour = request.hour
 
-    # Validate year
-    if not (2009 <= year <= 2023):
+    if month < 0 or day < 0 or hour < 0:
         return JSONResponse(
-            content={"status": "error", "message": "Year must be between 2009 and 2023"},
+            content={"status": "error", "message": "Month, day, and hour must be non-negative values"},
+            status_code=400
+        )
+
+    if not (1 <= month <= 12):
+        return JSONResponse(
+            content={"status": "error", "message": "Month must be between 1 and 12"},
+            status_code=400
+        )
+
+    if not is_valid_day(year, month, day):
+        return JSONResponse(
+            content={"status": "error", "message": f"Invalid day for the month {month}. Please enter a valid day."},
+            status_code=400
+        )
+
+    if not (0 <= hour < 24):
+        return JSONResponse(
+            content={"status": "error", "message": "Hour must be between 0 and 23"},
             status_code=400
         )
 
     try:
-        # Query the Supabase table using the provided parameters
+        if not (2009 <= year <= 2023):
+            client = GradioClient("ShreehariS754/Timely_Solar_Predictor")
+            result = client.predict(
+                year=year,
+                month=month,
+                day=day,
+                hour=hour,
+                api_name="/predict"
+            )
+
+            prediction_value = float(result[0][0])
+            final_prediction = round(prediction_value, 3) if prediction_value > 10 else 0
+
+            return {
+                "status": "success",
+                "data": {
+                    "solar_insolation": f"{final_prediction} watts/hr"
+                }
+            }
+            
+        gradio_client = GradioClient("ShreehariS754/X-Helios-Gradio")
         response = supabase.table("Hourly_weather").select("*").eq("year", year).eq("month", month).eq("day", day).eq("hour", hour).execute()
         data = response.dict().get('data', [])
 
@@ -69,7 +116,6 @@ async def get_data(request: DataRequest):
         factors_to_check = ['clearsky_dhi', 'clearsky_dni', 'clearsky_ghi', 'clearsky_gti', 'dhi', 'dni', 'ghi', 'gti']
         if all(weather_data[factor] == 0 for factor in factors_to_check) or all(v == 0 for v in weather_data.values()):
             gradio_prediction = 0
-            
         else:
             gradio_response = gradio_client.predict(
                 weather_data['air_temp'],
@@ -89,7 +135,7 @@ async def get_data(request: DataRequest):
                 weather_data['zenith'],
                 api_name="/predict"
             )
-            gradio_prediction = round((float(gradio_response.split()[-1])/(30*24))*1000, 3)
+            gradio_prediction = round((float(gradio_response.split()[-1]) / (30 * 24)) * 1000, 3)
 
         return {
             "status": "success",
